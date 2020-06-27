@@ -152,7 +152,7 @@ impl IntoRawFd for FileDesc {
 ///
 /// If the return value is -1, [`last_os_error()`](std::io::Error::last_os_error) is returned.
 /// Otherwise, the return value is returned wrapped as [`Ok`].
-pub fn check_ret(ret: c_int) -> std::io::Result<c_int> {
+fn check_ret(ret: c_int) -> std::io::Result<c_int> {
 	if ret == -1 {
 		Err(std::io::Error::last_os_error())
 	} else {
