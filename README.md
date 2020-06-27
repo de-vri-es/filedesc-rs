@@ -10,7 +10,7 @@ which acts as a thin wrapper around open file descriptors.
 The wrapped file descriptor is closed when the wrapper is dropped,
 unless [`FileDesc::into_raw_fd()`][into_raw_fd] was called.
 
-A raw file descriptor can be wrapper directly using [`FileDesc::from_raw()`][from_raw_fd],
+A raw file descriptor can be wrapped directly using [`FileDesc::from_raw_fd()`][from_raw_fd],
 or it can be duplicated and then wrapped using [`FileDesc::duplicate_raw_fd()`][duplicate_raw_fd].
 It is also possible to duplicate an already-wrapper file descriptor using [`FileDesc::duplicate()`][duplicate].
 If the platform supports it, all duplicated file descriptors are created with the `close-on-exec` flag set atomically,
