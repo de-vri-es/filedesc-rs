@@ -27,6 +27,12 @@
 
 use std::os::unix::io::{RawFd, AsRawFd, IntoRawFd, FromRawFd};
 use std::os::raw::c_int;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+
+/// If false, skip attempting to duplicate with F_DUPFD_CLOEXEC fcntl.
+///
+/// Used to reduce the number of syscalls on platforms that don't support it.
+static TRY_DUPFD_CLOEXEC: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 /// Thin wrapper around an open file descriptor.
@@ -48,20 +54,22 @@ impl FileDesc {
 
 	/// Duplicate a raw file descriptor and wrap it in a [`FileDesc`].
 	pub unsafe fn duplicate_raw_fd(fd: RawFd) -> std::io::Result<Self> {
-		// Try to dup with the CLOEXEC flag set.
-		check_ret(libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0))
-			.map(|raw| Self::from_raw_fd(raw))
-			.or_else(|e| {
-				// Fall back to setting CLOEXEC non-atomically.
-				if e.raw_os_error() == Some(libc::EINVAL) {
-					let fd = check_ret(libc::fcntl(fd, libc::F_DUPFD, 0))?;
-					let fd = Self::from_raw_fd(fd);
-					fd.set_close_on_exec(true)?;
-					Ok(fd)
-				} else {
-					Err(e)
-				}
-			})
+		// Try to dup with the close-on-exec flag set.
+		if TRY_DUPFD_CLOEXEC.load(Relaxed) {
+			match check_ret(libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0)) {
+				Err(ref e) if e.raw_os_error() == Some(libc::EINVAL) => {
+					TRY_DUPFD_CLOEXEC.store(false, Relaxed);
+				},
+				Ok(x) => return Ok(Self::from_raw_fd(x)),
+				Err(e) => return Err(e),
+			}
+		}
+
+		// Fall back to setting close-on-exec non-atomically.
+		let fd = check_ret(libc::fcntl(fd, libc::F_DUPFD, 0))?;
+		let fd = Self::from_raw_fd(fd);
+		fd.set_close_on_exec(true)?;
+		Ok(fd)
 	}
 
 	/// Get the raw file descriptor.
