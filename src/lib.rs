@@ -64,6 +64,11 @@ impl FileDesc {
 	///
 	/// This does not do anything to the file descriptor other than wrapping it.
 	/// Notably, it does not set the `close-on-exec` flag.
+	///
+	/// # Safety
+	/// The input must be a valid file descriptor.
+	/// The file descriptor must not be closed other than by the created [`FileDesc`],
+	/// unless ownership of the file descriptor is relinquished by calling [`into_raw_fd()`](Self::into_raw_fd).
 	pub unsafe fn from_raw_fd(fd: RawFd) -> Self {
 		Self { fd }
 	}
@@ -80,6 +85,11 @@ impl FileDesc {
 	///
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
+	///
+	/// # Safety
+	/// The input must be a valid file descriptor.
+	/// The file descriptor must not be closed other than by the created [`FileDesc`],
+	/// unless ownership of the file descriptor is relinquished by calling [`into_raw_fd()`](Self::into_raw_fd).
 	pub unsafe fn duplicate_raw_fd(fd: RawFd) -> std::io::Result<Self> {
 		// Try to dup with the close-on-exec flag set.
 		if TRY_DUPFD_CLOEXEC.load(Relaxed) {
