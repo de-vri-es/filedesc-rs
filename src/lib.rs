@@ -1,13 +1,20 @@
-//! This crate exposes a single type: [`FileDesc`],
+//! This crate exposes a single type: [`FileDesc`][FileDesc],
 //! which acts as a thin wrapper around open file descriptors.
+//! The wrapped file descriptor is closed when the wrapper is dropped.
 //!
-//! The wrapped file descriptor is closed when the wrapper is dropped,
-//! unless [`FileDesc::into_raw_fd()`] was called.
+//! You can call [`FileDesc::new()`][FileDesc::new] with any type that implements [`IntoRawFd`][IntoRawFd],
+//! or duplicate the file descriptor of a type that implements [`AsRawFd`][AsRawFd] with [`duplicate_from`][FileDesc::duplicate_from].
 //!
-//! A raw file descriptor can be wrapped directly using [`FileDesc::from_raw_fd()`],
-//! or it can be duplicated and then wrapped using [`FileDesc::duplicate_raw_fd()`].
-//! It is also possible to duplicate an already-wrapper file descriptor using [`FileDesc::duplicate()`].
-//! If the platform supports it, all duplicated file descriptors are created with the `close-on-exec` flag set atomically,
+//! The same is possible for raw file descriptors with the `unsafe` [`from_raw_fd()`][FileDesc::from_raw_fd] and [`duplicate_raw_fd()`][FileDesc::duplicate_raw_fd].
+//! Wrapped file descriptors can also be duplicated with the [`duplicate()`][FileDesc::duplicate] function.
+//!
+//! # Close-on-exec
+//! Whenever the library duplicates a file descriptor, it tries to set the `close-on-exec` flag atomically.
+//! On platforms where this is not supported, the library falls back to setting the flag non-atomically.
+//! When an existing file descriptor is wrapped, the `close-on-exec` flag is left as it was.
+//!
+//! You can also check or set the `close-on-exec` flag with the [`get_close_on_exec()`][FileDesc::get_close_on_exec]
+//! and [`set_close_on_exec`][FileDesc::set_close_on_exec] functions.
 //!
 //! # Example
 //! ```no_run
@@ -44,15 +51,35 @@ pub struct FileDesc {
 }
 
 impl FileDesc {
+	/// Create [`FileDesc`] from an object that owns a file descriptor.
+	///
+	/// This does not do anything to the file descriptor other than wrapping it.
+	/// Notably, it does not set the `close-on-exec` flag.
+	pub fn new<T: IntoRawFd>(fd: T) -> Self {
+		let fd = fd.into_raw_fd();
+		Self { fd }
+	}
+
 	/// Wrap a raw file descriptor in a [`FileDesc`].
 	///
-	/// This does not do anything to the file descriptor.
+	/// This does not do anything to the file descriptor other than wrapping it.
 	/// Notably, it does not set the `close-on-exec` flag.
 	pub unsafe fn from_raw_fd(fd: RawFd) -> Self {
 		Self { fd }
 	}
 
+	/// Duplicate a file descriptor from an object that has a file descriptor.
+	///
+	/// The new file descriptor will have the `close-on-exec` flag set.
+	/// If the platform supports it, the flag will be set atomically.
+	pub fn duplicate_from<T: AsRawFd>(other: &T) -> std::io::Result<Self> {
+		unsafe { Self::duplicate_raw_fd(other.as_raw_fd()) }
+	}
+
 	/// Duplicate a raw file descriptor and wrap it in a [`FileDesc`].
+	///
+	/// The new file descriptor will have the `close-on-exec` flag set.
+	/// If the platform supports it, the flag will be set atomically.
 	pub unsafe fn duplicate_raw_fd(fd: RawFd) -> std::io::Result<Self> {
 		// Try to dup with the close-on-exec flag set.
 		if TRY_DUPFD_CLOEXEC.load(Relaxed) {

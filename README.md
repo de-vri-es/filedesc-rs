@@ -6,20 +6,32 @@
 
 This crate exposes a single type: [`FileDesc`][FileDesc],
 which acts as a thin wrapper around open file descriptors.
+The wrapped file descriptor is closed when the wrapper is dropped.
 
-The wrapped file descriptor is closed when the wrapper is dropped,
-unless [`FileDesc::into_raw_fd()`][into_raw_fd] was called.
+You can call [`FileDesc::new()`][FileDesc::new] with any type that implements [`IntoRawFd`][IntoRawFd],
+or duplicate the file descriptor of a type that implements [`AsRawFd`][AsRawFd] with [`duplicate_from`][FileDesc::duplicate_from].
 
-A raw file descriptor can be wrapped directly using [`FileDesc::from_raw_fd()`][from_raw_fd],
-or it can be duplicated and then wrapped using [`FileDesc::duplicate_raw_fd()`][duplicate_raw_fd].
-It is also possible to duplicate an already-wrapper file descriptor using [`FileDesc::duplicate()`][duplicate].
-If the platform supports it, all duplicated file descriptors are created with the `close-on-exec` flag set atomically,
+The same is possible for raw file descriptors with the `unsafe` [`from_raw_fd()`][FileDesc::from_raw_fd] and [`duplicate_raw_fd()`][FileDesc::duplicate_raw_fd].
+Wrapped file descriptors can also be duplicated with the [`duplicate()`][FileDesc::duplicate] function.
+
+## Close-on-exec
+Whenever the library duplicates a file descriptor, it tries to set the `close-on-exec` flag atomically.
+On platforms where this is not supported, the library falls back to setting the flag non-atomically.
+When an existing file descriptor is wrapped, the `close-on-exec` flag is left as it was.
+
+You can also check or set the `close-on-exec` flag with the [`get_close_on_exec()`][FileDesc::get_close_on_exec]
+and [`set_close_on_exec`][FileDesc::set_close_on_exec] functions.
 
 [FileDesc]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html
-[into_raw_fd]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.into_raw_fd
-[from_raw_fd]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.from_raw_fd
-[duplicate_raw_fd]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.duplicate_raw_fd
-[duplicate]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.duplicate
+[FileDesc::new]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.new
+[FileDesc::duplicate_from]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.duplicate_from
+[FileDesc::from_raw_fd]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.from_raw_fd
+[FileDesc::duplicate_raw_fd]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.duplicate_raw_fd
+[FileDesc::duplicate]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.duplicate
+[FileDesc::get_close_on_exec]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.get_close_on_exec
+[FileDesc::set_close_on_exec]: https://docs.rs/filedesc/latest/filedesc/struct.FileDesc.html#method.set_close_on_exec
+[AsRawFd]: https://doc.rust-lang.org/stable/std/os/unix/io/trait.AsRawFd.html
+[IntoRawFd]: https://doc.rust-lang.org/stable/std/os/unix/io/trait.IntoRawFd.html
 
 ## Example
 ```rust
