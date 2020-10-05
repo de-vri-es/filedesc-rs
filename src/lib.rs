@@ -31,9 +31,8 @@
 //! # }
 //! ```
 
-
-use std::os::unix::io::{RawFd, AsRawFd, IntoRawFd, FromRawFd};
 use std::os::raw::c_int;
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
 /// If false, skip attempting to duplicate with F_DUPFD_CLOEXEC fcntl.
@@ -132,9 +131,7 @@ impl FileDesc {
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
 	pub fn duplicate(&self) -> std::io::Result<Self> {
-		unsafe {
-			Self::duplicate_raw_fd(self.as_raw_fd())
-		}
+		unsafe { Self::duplicate_raw_fd(self.as_raw_fd()) }
 	}
 
 	/// Change the close-on-exec flag of the file descriptor.
