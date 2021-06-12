@@ -1,3 +1,6 @@
+v0.3.1:
+  * Generate a clear compilation error on non-Unix platforms.
+
 v0.3.0:
   * Add `new()` function that convert `IntoRawFd` objects.
   * Add `duplicate_from()` function that duplicates `AsRawFd` objects.
