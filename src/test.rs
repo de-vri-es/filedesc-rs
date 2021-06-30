@@ -7,12 +7,12 @@ fn test_get_close_on_exec() {
 	assert!(let Ok(true) = fd.get_close_on_exec());
 	assert!(let Ok(()) = fd.set_close_on_exec(false));
 	assert!(let Ok(false) = fd.get_close_on_exec());
-	assert!(let Ok(_) = fd.duplicate());
+	assert!(let Ok(_) = unsafe { fd.duplicate() });
 }
 
 #[test]
 fn duplicate_convert_stdout() {
-	let_assert!(Ok(fd) = FileDesc::duplicate_from(&std::io::stdout()));
+	let_assert!(Ok(fd) = unsafe { FileDesc::duplicate_from(&std::io::stdout()) });
 	assert!(fd.as_raw_fd() != 0);
 	assert!(fd.as_raw_fd() != 1);
 	assert!(fd.as_raw_fd() != 2);

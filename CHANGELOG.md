@@ -1,3 +1,7 @@
+v0.4.0
+  * Make `FileDesc::duplicate` and `FileDesc::duplicate_from` unsafe (see the docs for more information).
+  * Fix safety documentation of `FileDesc::duplicate_raw_fd`.
+
 v0.3.1:
   * Generate a clear compilation error on non-Unix platforms.
 
