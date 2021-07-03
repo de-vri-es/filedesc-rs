@@ -21,9 +21,12 @@ impl FileDesc {
 	///
 	/// This does not do anything to the file descriptor other than wrapping it.
 	/// Notably, it does not set the `close-on-exec` flag.
-	pub fn new<T: IntoRawFd>(fd: T) -> Self {
-		let fd = fd.into_raw_fd();
-		Self { fd }
+	///
+	/// # Safety
+	/// The input must be a valid file descriptor.
+	/// The file descriptor must not be closed as long as it is managed by the created [`FileDesc`].
+	pub unsafe fn new<T: IntoRawFd>(fd: T) -> Self {
+		Self::from_raw_fd(fd.into_raw_fd())
 	}
 
 	/// Wrap a raw file descriptor in a [`FileDesc`].
@@ -33,8 +36,7 @@ impl FileDesc {
 	///
 	/// # Safety
 	/// The input must be a valid file descriptor.
-	/// The file descriptor must not be closed other than by the created [`FileDesc`],
-	/// unless ownership of the file descriptor is relinquished by calling [`into_raw_fd()`](Self::into_raw_fd).
+	/// The file descriptor must not be closed as long as it is managed by the created [`FileDesc`].
 	pub unsafe fn from_raw_fd(fd: RawFd) -> Self {
 		Self { fd }
 	}
@@ -44,12 +46,11 @@ impl FileDesc {
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
 	///
-	/// # Safety
-	/// The input must be a valid file descriptor.
-	///
-	/// Additionally, duplicating a file descriptor might violate the safety requirements of the object that manages the original file descriptor.
 	/// The duplicated [`FileDesc`] will be the sole owner of the new file descriptor, but it will share ownership of the underlying kernel object.
-	/// Any safe APIs that rely on an owned file descriptor to be the sole owner of the kernel object could start exhibiting undefined behaviour.
+	///
+	/// # Safety
+	/// The file descriptor must be valid,
+	/// and duplicating it must not violate the safety requirements of any object already using the file descriptor.
 	pub unsafe fn duplicate_from<T: AsRawFd>(other: &T) -> std::io::Result<Self> {
 		Self::duplicate_raw_fd(other.as_raw_fd())
 	}
@@ -59,12 +60,11 @@ impl FileDesc {
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
 	///
-	/// # Safety
-	/// The input must be a valid file descriptor.
-	///
-	/// Additionally, duplicating a file descriptor might violate the safety requirements of the object that manages the original file descriptor.
 	/// The duplicated [`FileDesc`] will be the sole owner of the new file descriptor, but it will share ownership of the underlying kernel object.
-	/// Any safe APIs that rely on an owned file descriptor to be the sole owner of the kernel object could start exhibiting undefined behaviour.
+	///
+	/// # Safety
+	/// The file descriptor must be valid,
+	/// and duplicating it must not violate the safety requirements of any object already using the file descriptor.
 	pub unsafe fn duplicate_raw_fd(fd: RawFd) -> std::io::Result<Self> {
 		// Try to dup with the close-on-exec flag set.
 		if TRY_DUPFD_CLOEXEC.load(Relaxed) {
@@ -104,14 +104,12 @@ impl FileDesc {
 
 	/// Try to duplicate the file descriptor.
 	///
+	/// The duplicated [`FileDesc`] will be the sole owner of the new file descriptor, but it will share ownership of the underlying kernel object.
+	///
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
-	///
-	/// # Safety
-	/// The duplicated [`FileDesc`] will be the sole owner of the new file descriptor, but it will share ownership of the underlying kernel object.
-	/// Any safe APIs that rely on an owned file descriptor to be the sole owner of the kernel object could start exhibiting undefined behaviour.
-	pub unsafe fn duplicate(&self) -> std::io::Result<Self> {
-		Self::duplicate_from(self)
+	pub fn duplicate(&self) -> std::io::Result<Self> {
+		unsafe { Self::duplicate_from(self) }
 	}
 
 	/// Change the close-on-exec flag of the file descriptor.

@@ -13,10 +13,6 @@ or duplicate the file descriptor of a type that implements [`AsRawFd`][std::os::
 or directly from a raw file descriptor with [`from_raw_fd()`][FileDesc::from_raw_fd] and [`duplicate_raw_fd()`][FileDesc::duplicate_raw_fd].
 Wrapped file descriptors can also be duplicated with the [`duplicate()`][FileDesc::duplicate] function.
 
-Note that duplicating file descriptors is always unsafe, even if it is known to be a valid file descriptor.
-This is because the new file descriptor still shares ownership of the underlying kernel object with the original file descriptor.
-This could violate the assumptions of otherwise safe APIs, which in turn would lead to unsound programs.
-
 ## Close-on-exec
 Whenever the library duplicates a file descriptor, it tries to set the `close-on-exec` flag atomically.
 On platforms where this is not supported, the library falls back to setting the flag non-atomically.

@@ -7,7 +7,7 @@ fn test_get_close_on_exec() {
 	assert!(let Ok(true) = fd.get_close_on_exec());
 	assert!(let Ok(()) = fd.set_close_on_exec(false));
 	assert!(let Ok(false) = fd.get_close_on_exec());
-	assert!(let Ok(_) = unsafe { fd.duplicate() });
+	assert!(let Ok(_) = fd.duplicate());
 }
 
 #[test]
@@ -18,6 +18,6 @@ fn duplicate_convert_stdout() {
 	assert!(fd.as_raw_fd() != 2);
 
 	let raw = fd.as_raw_fd();
-	let fd = FileDesc::new(fd);
+	let fd = unsafe { FileDesc::new(fd) };
 	assert!(fd.as_raw_fd() == raw);
 }
