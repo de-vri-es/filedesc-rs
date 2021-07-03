@@ -114,8 +114,10 @@ impl FileDesc {
 
 	/// Change the close-on-exec flag of the file descriptor.
 	///
-	/// Note that you should always try to create file descriptors with the close-on-exec flag already set atomically.
+	/// You should always try to create file descriptors with the close-on-exec flag already set atomically instead of changing it later with this function.
 	/// Setting the flag later on introduces a race condition if another thread forks before the call to `set_close_on_exec` finishes.
+	///
+	/// You can use this without any race condition to disable the `close-on-exec` flag *after* forking but before executing a new program.
 	pub fn set_close_on_exec(&self, close_on_exec: bool) -> std::io::Result<()> {
 		unsafe {
 			// TODO: Are there platforms where we need to preserve other bits?
