@@ -1,3 +1,6 @@
+v0.6.1
+  * Fix tests and update example.
+
 v0.6.0
   * Make use of `OwnedFd`, `BorrowedFd` and `AsFd`.
 
