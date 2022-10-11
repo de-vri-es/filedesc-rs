@@ -21,7 +21,7 @@
 //! # let raw_fd = 10;
 //! use filedesc::FileDesc;
 //! let fd = unsafe { FileDesc::from_raw_fd(raw_fd) };
-//! let duplicated = unsafe { fd.duplicate()? };
+//! let duplicated = fd.duplicate()?;
 //! assert_eq!(duplicated.get_close_on_exec()?, true);
 //!
 //! duplicated.set_close_on_exec(false)?;

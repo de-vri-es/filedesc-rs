@@ -12,12 +12,12 @@ fn test_get_close_on_exec() {
 
 #[test]
 fn duplicate_convert_stdout() {
-	let_assert!(Ok(fd) = unsafe { FileDesc::duplicate_from(&std::io::stdout()) });
+	let_assert!(Ok(fd) = FileDesc::duplicate_from(&std::io::stdout()));
 	assert!(fd.as_raw_fd() != 0);
 	assert!(fd.as_raw_fd() != 1);
 	assert!(fd.as_raw_fd() != 2);
 
 	let raw = fd.as_raw_fd();
-	let fd = unsafe { FileDesc::new(fd) };
+	let fd = FileDesc::new(fd.into_fd());
 	assert!(fd.as_raw_fd() == raw);
 }
