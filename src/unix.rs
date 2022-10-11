@@ -14,9 +14,9 @@ pub struct FileDesc {
 }
 
 impl FileDesc {
-	/// Create [`FileDesc`] from an object that owns a file descriptor.
+	/// Create [`FileDesc`] from an owned file descriptor.
 	///
-	/// This does not do anything to the file descriptor other than wrapping it.
+	/// This does not do anything to the file descriptor other than wrap it.
 	/// Notably, it does not set the `close-on-exec` flag.
 	pub fn new(fd: OwnedFd) -> Self {
 		Self { fd }
