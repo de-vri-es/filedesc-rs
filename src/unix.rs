@@ -1,11 +1,8 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+
 use std::os::raw::c_int;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-
-/// If false, skip attempting to duplicate with F_DUPFD_CLOEXEC fcntl.
-///
-/// Used to reduce the number of syscalls on platforms that don't support it.
-static TRY_DUPFD_CLOEXEC: AtomicBool = AtomicBool::new(false);
+use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 
 #[derive(Debug)]
 /// Thin wrapper around an open file descriptor.
@@ -13,7 +10,7 @@ static TRY_DUPFD_CLOEXEC: AtomicBool = AtomicBool::new(false);
 /// The wrapped file descriptor will be closed
 /// when the wrapper is dropped.
 pub struct FileDesc {
-	fd: RawFd,
+	fd: OwnedFd,
 }
 
 impl FileDesc {
@@ -21,12 +18,8 @@ impl FileDesc {
 	///
 	/// This does not do anything to the file descriptor other than wrapping it.
 	/// Notably, it does not set the `close-on-exec` flag.
-	///
-	/// # Safety
-	/// The input must be a valid file descriptor.
-	/// The file descriptor must not be closed as long as it is managed by the created [`FileDesc`].
-	pub unsafe fn new<T: IntoRawFd>(fd: T) -> Self {
-		Self::from_raw_fd(fd.into_raw_fd())
+	pub fn new(fd: OwnedFd) -> Self {
+		Self { fd }
 	}
 
 	/// Wrap a raw file descriptor in a [`FileDesc`].
@@ -38,7 +31,9 @@ impl FileDesc {
 	/// The input must be a valid file descriptor.
 	/// The file descriptor must not be closed as long as it is managed by the created [`FileDesc`].
 	pub unsafe fn from_raw_fd(fd: RawFd) -> Self {
-		Self { fd }
+		unsafe {
+			Self::new(OwnedFd::from_raw_fd(fd))
+		}
 	}
 
 	/// Duplicate a file descriptor from an object that has a file descriptor.
@@ -47,12 +42,8 @@ impl FileDesc {
 	/// If the platform supports it, the flag will be set atomically.
 	///
 	/// The duplicated [`FileDesc`] will be the sole owner of the new file descriptor, but it will share ownership of the underlying kernel object.
-	///
-	/// # Safety
-	/// The file descriptor must be valid,
-	/// and duplicating it must not violate the safety requirements of any object already using the file descriptor.
-	pub unsafe fn duplicate_from<T: AsRawFd>(other: &T) -> std::io::Result<Self> {
-		Self::duplicate_raw_fd(other.as_raw_fd())
+	pub fn duplicate_from<T: AsFd>(other: T) -> std::io::Result<Self> {
+		Ok(Self::new(other.as_fd().try_clone_to_owned()?))
 	}
 
 	/// Duplicate a raw file descriptor and wrap it in a [`FileDesc`].
@@ -66,22 +57,25 @@ impl FileDesc {
 	/// The file descriptor must be valid,
 	/// and duplicating it must not violate the safety requirements of any object already using the file descriptor.
 	pub unsafe fn duplicate_raw_fd(fd: RawFd) -> std::io::Result<Self> {
-		// Try to dup with the close-on-exec flag set.
-		if TRY_DUPFD_CLOEXEC.load(Relaxed) {
-			match check_ret(libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0)) {
-				Err(ref e) if e.raw_os_error() == Some(libc::EINVAL) => {
-					TRY_DUPFD_CLOEXEC.store(false, Relaxed);
-				},
-				Ok(x) => return Ok(Self::from_raw_fd(x)),
-				Err(e) => return Err(e),
-			}
+		unsafe {
+			Self::duplicate_from(BorrowedFd::borrow_raw(fd))
 		}
+	}
 
-		// Fall back to setting close-on-exec non-atomically.
-		let fd = check_ret(libc::fcntl(fd, libc::F_DUPFD, 0))?;
-		let fd = Self::from_raw_fd(fd);
-		fd.set_close_on_exec(true)?;
-		Ok(fd)
+	/// Get the file descriptor.
+	///
+	/// This function does not release ownership of the underlying file descriptor.
+	/// The file descriptor will still be closed when the [`FileDesc`] is dropped.
+	pub fn as_fd(&self) -> BorrowedFd {
+		self.fd.as_fd()
+	}
+
+	/// Release and get the raw file descriptor.
+	///
+	/// This function releases ownership of the underlying file descriptor.
+	/// The file descriptor will not be closed.
+	pub fn into_fd(self) -> OwnedFd {
+		self.fd
 	}
 
 	/// Get the raw file descriptor.
@@ -89,7 +83,7 @@ impl FileDesc {
 	/// This function does not release ownership of the underlying file descriptor.
 	/// The file descriptor will still be closed when the [`FileDesc`] is dropped.
 	pub fn as_raw_fd(&self) -> RawFd {
-		self.fd
+		self.fd.as_raw_fd()
 	}
 
 	/// Release and get the raw file descriptor.
@@ -97,9 +91,7 @@ impl FileDesc {
 	/// This function releases ownership of the underlying file descriptor.
 	/// The file descriptor will not be closed.
 	pub fn into_raw_fd(self) -> RawFd {
-		let fd = self.fd;
-		std::mem::forget(self);
-		fd
+		self.fd.into_raw_fd()
 	}
 
 	/// Try to duplicate the file descriptor.
@@ -109,7 +101,7 @@ impl FileDesc {
 	/// The new file descriptor will have the `close-on-exec` flag set.
 	/// If the platform supports it, the flag will be set atomically.
 	pub fn duplicate(&self) -> std::io::Result<Self> {
-		unsafe { Self::duplicate_from(self) }
+		Self::duplicate_from(self)
 	}
 
 	/// Change the close-on-exec flag of the file descriptor.
@@ -122,7 +114,7 @@ impl FileDesc {
 		unsafe {
 			// TODO: Are there platforms where we need to preserve other bits?
 			let arg = if close_on_exec { libc::FD_CLOEXEC } else { 0 };
-			check_ret(libc::fcntl(self.fd, libc::F_SETFD, arg))?;
+			check_ret(libc::fcntl(self.fd.as_raw_fd(), libc::F_SETFD, arg))?;
 			Ok(())
 		}
 	}
@@ -130,25 +122,23 @@ impl FileDesc {
 	/// Check the close-on-exec flag of the file descriptor.
 	pub fn get_close_on_exec(&self) -> std::io::Result<bool> {
 		unsafe {
-			let ret = check_ret(libc::fcntl(self.fd, libc::F_GETFD, 0))?;
+			let ret = check_ret(libc::fcntl(self.fd.as_raw_fd(), libc::F_GETFD, 0))?;
 			Ok(ret & libc::FD_CLOEXEC != 0)
 		}
 	}
 }
 
-impl Drop for FileDesc {
-	fn drop(&mut self) {
-		if self.fd >= 0 {
-			unsafe {
-				libc::close(self.fd);
-			}
-		}
+impl AsFd for FileDesc {
+	fn as_fd(&self) -> BorrowedFd<'_> {
+		self.fd.as_fd()
 	}
 }
 
 impl FromRawFd for FileDesc {
 	unsafe fn from_raw_fd(fd: RawFd) -> Self {
-		Self::from_raw_fd(fd)
+		unsafe {
+			Self::from_raw_fd(fd)
+		}
 	}
 }
 
