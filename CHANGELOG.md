@@ -1,3 +1,6 @@
+v0.6.0
+  * Make use of `OwnedFd`, `BorrowedFd` and `AsFd`.
+
 v0.5.0
   * Make `FileDesc::new` unsafe.
   * Make `FileDesc::duplicate` safe again.
