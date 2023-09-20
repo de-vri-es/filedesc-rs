@@ -1,4 +1,4 @@
-main:
+v0.6.3:
   * Implement `From<FileDesc>` for `OwnedFd`.
 
 v0.6.2:
