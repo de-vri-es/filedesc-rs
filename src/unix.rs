@@ -134,6 +134,18 @@ impl AsFd for FileDesc {
 	}
 }
 
+impl From<OwnedFd> for FileDesc {
+	fn from(value: OwnedFd) -> Self {
+		Self::new(value)
+	}
+}
+
+impl From<FileDesc> for OwnedFd {
+	fn from(value: FileDesc) -> Self {
+		value.fd
+	}
+}
+
 impl FromRawFd for FileDesc {
 	unsafe fn from_raw_fd(fd: RawFd) -> Self {
 		unsafe {
@@ -157,12 +169,6 @@ impl AsRawFd for &'_ FileDesc {
 impl IntoRawFd for FileDesc {
 	fn into_raw_fd(self) -> RawFd {
 		self.into_raw_fd()
-	}
-}
-
-impl From<OwnedFd> for FileDesc {
-	fn from(value: OwnedFd) -> Self {
-		Self::new(value)
 	}
 }
 
