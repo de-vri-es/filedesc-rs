@@ -1,3 +1,6 @@
+main
+  * Implement `From<OwnedFd>` for `FileDesc`.
+
 v0.6.1
   * Fix tests and update example.
 

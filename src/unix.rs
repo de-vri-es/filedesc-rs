@@ -160,6 +160,12 @@ impl IntoRawFd for FileDesc {
 	}
 }
 
+impl From<OwnedFd> for FileDesc {
+	fn from(value: OwnedFd) -> Self {
+		Self::new(value)
+	}
+}
+
 /// Wrap the return value of a libc function in an [`std::io::Result`].
 ///
 /// If the return value is -1, [`last_os_error()`](std::io::Error::last_os_error) is returned.
